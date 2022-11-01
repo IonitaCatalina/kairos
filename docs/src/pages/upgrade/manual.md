@@ -4,6 +4,8 @@ title: "Manual"
 index: 2
 ---
 
+# Upgrading manually
+
 Upgrades can be run manually from the terminal.
 
 Kairos images are released on [quay.io](https://quay.io/repository/kairos/kairos).
@@ -23,13 +25,13 @@ v0.57.0-alpha1
 
 ## Upgrade
 
-To upgrade to the latest available version, run from a shell of a cluster node:
+To upgrade to the latest available version, run from a shell of a cluster node the following:
 
 ```bash
 sudo kairos-agent upgrade
 ```
 
-To specify a version, run
+To specify a version, run:
 
 ```bash
 sudo kairos-agent upgrade <version>
@@ -37,10 +39,8 @@ sudo kairos-agent upgrade <version>
 
 Use `--force` to force upgrading to avoid checking versions.
 
-It is possible although to use the same command set from `Elemental-toolkit`. So for example, the following works too:
+To specify a specific image, use the `--image` flag:
 
 ```bash
-sudo elemental upgrade --no-verify --docker-image quay.io/kairos/kairos:opensuse-v1.21.4-22
+sudo kairos-agent upgrade --image <image>
 ```
-
-[See also the general Elemental-toolkit documentation](https://rancher.github.io/elemental-toolkit/docs/getting-started/upgrading/#upgrade-to-a-specific-container-image) which applies for Kairos as well.

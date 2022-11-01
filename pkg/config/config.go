@@ -18,12 +18,15 @@ import (
 )
 
 type Install struct {
-	Auto        bool              `yaml:"auto,omitempty"`
-	Reboot      bool              `yaml:"reboot,omitempty"`
-	Device      string            `yaml:"device,omitempty"`
-	Poweroff    bool              `yaml:"poweroff,omitempty"`
-	GrubOptions map[string]string `yaml:"grub_options,omitempty"`
-	Bundles     Bundles           `yaml:"bundles,omitempty"`
+	Auto                   bool              `yaml:"auto,omitempty"`
+	Reboot                 bool              `yaml:"reboot,omitempty"`
+	Device                 string            `yaml:"device,omitempty"`
+	Poweroff               bool              `yaml:"poweroff,omitempty"`
+	GrubOptions            map[string]string `yaml:"grub_options,omitempty"`
+	Bundles                Bundles           `yaml:"bundles,omitempty"`
+	Encrypt                []string          `yaml:"encrypted_partitions,omitempty"`
+	SkipEncryptCopyPlugins bool              `yaml:"skip_copy_kcrypt_plugin,omitempty"`
+	Env                    []string          `yaml:"env,omitempty"`
 }
 
 type Config struct {
@@ -36,6 +39,8 @@ type Config struct {
 	Options            map[string]string `yaml:"options,omitempty"`
 	FailOnBundleErrors bool              `yaml:"fail_on_bundles_errors,omitempty"`
 	Bundles            Bundles           `yaml:"bundles,omitempty"`
+	GrubOptions        map[string]string `yaml:"grub_options,omitempty"`
+	Env                []string          `yaml:"env,omitempty"`
 }
 
 type Bundles []Bundle

@@ -107,6 +107,9 @@ func Install(dir ...string) error {
 
 		return nil
 	}
+	if err != nil {
+		fmt.Printf("- config not found in the system: %s", err.Error())
+	}
 
 	_, err = bus.Manager.Publish(events.EventChallenge, events.EventPayload{Config: cc.String()})
 	if err != nil {
@@ -225,6 +228,9 @@ func RunInstall(options map[string]string) error {
 	if reboot {
 		c.Install.Reboot = true
 	}
+
+	env := append(c.Install.Env, c.Env...)
+	utils.SetEnv(env)
 
 	err := ioutil.WriteFile(f.Name(), []byte(cloudInit), os.ModePerm)
 	if err != nil {

@@ -264,18 +264,26 @@ workflows:
     #         test_suite: ["upgrade-with-cli"]
     #     requires:
     #     - build-iso
-    - run-bundles-test:
-        matrix:
-          parameters:
-            flavor: ["opensuse"]
-        requires:
-        - build-iso
-    - build-iso:
-        matrix:
-          parameters:
-            image: [quay.io/kairos/core]
-            flavor: ["alpine","opensuse","ubuntu"]
-            release: ["no"]
+    # - run-bundles-test:
+    #     matrix:
+    #       parameters:
+    #         flavor: ["opensuse"]
+    #     requires:
+    #     - build-iso
+    # - build-iso:
+    #     matrix:
+    #       parameters:
+    #         image: [quay.io/kairos/core]
+    #         flavor: ["alpine","opensuse","ubuntu", "rockylinux", "fedora"]
+    #         release: ["no"]
+    # - run-datasource-test:
+    #     matrix:
+    #       parameters:
+    #         cloud_config: ["autoinstall"]
+    #         flavor: ["fedora", "rockylinux"]
+    #         test_suite: ["reset-test", "autoinstall-test"]
+    #     requires:
+    #     - build-iso
   lint:
     jobs:
       - lint

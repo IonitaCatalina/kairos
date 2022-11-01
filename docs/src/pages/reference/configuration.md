@@ -4,10 +4,12 @@ title: "Configuration reference"
 index: 5
 ---
 
+# Configuration reference
+
 Here you can find a full reference of the fields available to configure a Kairos node.
 
 ```yaml
-#node-config
+#cloud-config
 
 # The kairos block enables the p2p full-mesh functionalities.
 # To disable, don't specify one.
@@ -45,6 +47,9 @@ install:
     extra_passive_cmdline: ""
     # Change GRUB menu entry
     default_menu_entry: ""
+  # Environmental variable to set to the installer calls
+  env:
+    foo: "bar"
 
 vpn:
   # EdgeVPN environment options
@@ -98,15 +103,63 @@ options:
   recovery-system.uri: ""
   # Just set it to eject the cd after install
   eject-cd: ""
+
+# Standard cloud-init syntax, see: https://github.com/mudler/yip/tree/e688612df3b6f24dba8102f63a76e48db49606b2#compatibility-with-cloud-init-format
+growpart:
+ devices: ['/']
+
+users:
+- name: "kairos"
+  passwd: "kairos"
+  lock_passwd: true
+  groups: "admins"
+  ssh_authorized_keys:
+  - github:mudler
+
+runcmd:
+- foo
+hostname: "bar"
+write_files:
+- encoding: b64
+  content: CiMgVGhpcyBmaWxlIGNvbnRyb2xzIHRoZSBzdGF0ZSBvZiBTRUxpbnV4
+  path: /foo/bar
+  permissions: "0644"
+  owner: "bar"
 ```
 
 ## Syntax
 
-Kairos supports the standard `cloud-init` syntax, and the extended one from the [Elemental-toolkit](https://rancher.github.io/elemental-toolkit/docs/reference/cloud_init/) which is based on [yip](https://github.com/mudler/yip).
+Kairos supports the standard `cloud-init` syntax, and the extended syntax which is based on [yip](https://github.com/mudler/yip).
 
 Examples using the extended notation for running K3s as agent or server are in [examples](https://github.com/kairos-io/kairos/tree/master/examples).
 
-The extended syntax can be also used to pass-by commands via Kernel boot parameters
+For instance, to set up the DNS at the boot stage:
+
+```yaml
+stages:
+  boot:
+    - name: "DNS settings"
+      dns:
+        path: /etc/resolv.conf
+        nameservers:
+          - 8.8.8.8
+```
+
+The extended syntax can be also used to pass-by commands via Kernel boot parameters, see examples below. 
+
+## Automatic Hostname at scale
+
+Sometimes you may want to create a single `cloud-init` file for a set of machines and also make sure each node has a different hostname.
+
+The cloud-config syntax supports templating, so you can automate hostname generation based on the `machine ID` which is generated for each host:
+
+```yaml
+#node-config
+stages:
+  initramfs:
+    - name: "Setup hostname"
+      hostname: "node-{{ trunc 4 .MachineID }}"
+```
 
 ### `k3s`
 
@@ -143,11 +196,11 @@ k3s-agent:
 {{% /tab %}}
 {{< /tabs >}}
 
-See also the [examples'](https://github.com/kairos-io/kairos/tree/master/examples) folder in the repository to configure K3s manually.
+See also the [examples](https://github.com/kairos-io/kairos/tree/master/examples) folder in the repository to configure K3s manually.
 
 ## `install.grub_options`
 
-Is a map of key/value grub options to be set in the grub environment after installation.
+This is a map of key/value GRUB options to be set in the GRUB environment after installation.
 
 It can be used to set additional boot arguments on boot, consider to set `panic=0` as bootarg:
 
@@ -207,7 +260,7 @@ vpn:
 
 ## Automatic kubernetes deployments
 
-When using the `k3s` as Kubernetes distribution, it's possible to automatically deploy helm charts or Kubernetes resources automatically after deployment, for instance to deploy fleet automatically:
+When using the `k3s` as Kubernetes distribution, it's possible to automatically deploy Helm charts or Kubernetes resources automatically after deployment, for instance to deploy fleet automatically:
 
 ```yaml
 name: "Deploy fleet out of the box"

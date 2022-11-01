@@ -4,7 +4,7 @@ ARG VARIANT=core # core, lite, framework
 ARG FLAVOR=opensuse
 ARG IMAGE=quay.io/kairos/${VARIANT}-${FLAVOR}:latest
 ARG ISO_NAME=kairos-${VARIANT}-${FLAVOR}
-ARG LUET_VERSION=0.32.4
+ARG LUET_VERSION=0.33.0
 ARG OS_ID=kairos
 ARG REPOSITORIES_FILE=repositories.yaml
 
@@ -17,8 +17,7 @@ ELSE
 END
 ARG COSIGN_EXPERIMENTAL=0
 ARG CGO_ENABLED=0
-ARG ELEMENTAL_IMAGE=quay.io/costoolkit/elemental-cli:v0.0.15-8a78e6b
-ARG OSBUILDER_IMAGE=quay.io/kairos/osbuilder-tools
+ARG OSBUILDER_IMAGE=quay.io/kairos/osbuilder-tools:v0.2.3
 ARG GOLINT_VERSION=1.47.3
 ARG GO_VERSION=1.18
 
@@ -162,18 +161,21 @@ framework:
 
     ENV USER=root
 
-    IF [ "$FLAVOR" == "ubuntu-rolling" ]
+    IF [ "$FLAVOR" == "ubuntu-20-lts" ] || [ "$FLAVOR" == "ubuntu-22-lts" ]
         ARG TOOLKIT_IMG="ubuntu"
+    ELSE IF [ "$FLAVOR" == "rockylinux" ]
+        ARG TOOLKIT_IMG="fedora"
     ELSE IF [ "$FLAVOR" != "ubuntu" ] && [ "$FLAVOR" != "opensuse" ] && [ "$FLAVOR" != "fedora" ]
         ARG TOOLKIT_IMG="opensuse"
     ELSE
         ARG TOOLKIT_IMG="$FLAVOR"
     END
 
+    # Framework files
     RUN luet install -y --system-target /framework \
-            system/elemental-toolkit-$TOOLKIT_IMG
+            system/elemental-toolkit-$TOOLKIT_IMG dracut/kcrypt system/kcrypt system/suc-upgrade
 
-    IF [ "$WITH_KERNEL" = "true" ] || [ "$FLAVOR" = "alpine" ] || [ "$FLAVOR" = "fedora" ] || [ "$FLAVOR" = "rockylinux" ] || [ "$FLAVOR" = "alpine-arm-rpi" ]
+    IF [ "$WITH_KERNEL" = "true" ] || [ "$FLAVOR" = "alpine" ] || [ "$FLAVOR" = "alpine-arm-rpi" ]
         RUN luet install -y --system-target /framework \
             distro-kernels/opensuse distro-initrd/opensuse
     END
@@ -240,7 +242,9 @@ docker:
         COPY overlay/files-opensuse-arm-rpi/ /
     ELSE IF [ "$FLAVOR" = "opensuse-arm-rpi" ]
         COPY overlay/files-opensuse-arm-rpi/ /
-    ELSE IF [ "$FLAVOR" = "ubuntu" ] || [ "$FLAVOR" = "ubuntu-rolling" ]
+    ELSE IF [ "$FLAVOR" = "fedora" ] || [ "$FLAVOR" = "rockylinux" ]
+        COPY overlay/files-fedora/ /
+    ELSE IF [ "$FLAVOR" = "ubuntu" ] || [ "$FLAVOR" = "ubuntu-20-lts" ] || [ "$FLAVOR" = "ubuntu-22-lts" ]
         COPY overlay/files-ubuntu/ /
     END
 
@@ -250,7 +254,16 @@ docker:
     # Regenerate initrd if necessary
     IF [ "$FLAVOR" = "opensuse" ] || [ "$FLAVOR" = "opensuse-arm-rpi" ] || [ "$FLAVOR" = "tumbleweed-arm-rpi" ]
      RUN mkinitrd
-    ELSE IF [ "$FLAVOR" = "ubuntu" ] || [ "$FLAVOR" = "ubuntu-rolling" ]
+    ELSE IF [ "$FLAVOR" = "fedora" ] || [ "$FLAVOR" = "rockylinux" ]
+     RUN kernel=$(ls /boot/vmlinuz-* | head -n1) && \
+            ln -sf "${kernel#/boot/}" /boot/vmlinuz
+     RUN kernel=$(ls /lib/modules | head -n1) && \
+            dracut -v -N -f "/boot/initrd-${kernel}" "${kernel}" && \
+            ln -sf "initrd-${kernel}" /boot/initrd
+     RUN kernel=$(ls /lib/modules | head -n1) && depmod -a "${kernel}"
+     # https://github.com/kairos-io/elemental-cli/blob/23ca64435fedb9f521c95e798d2c98d2714c53bd/pkg/elemental/elemental.go#L553
+     RUN rm -rf /boot/initramfs-*
+    ELSE IF [ "$FLAVOR" = "ubuntu" ] || [ "$FLAVOR" = "ubuntu-20-lts" ] || [ "$FLAVOR" = "ubuntu-22-lts" ]
      RUN kernel=$(ls /boot/vmlinuz-* | head -n1) && \
             ln -sf "${kernel#/boot/}" /boot/vmlinuz
      RUN kernel=$(ls /lib/modules | head -n1) && \
@@ -259,9 +272,16 @@ docker:
      RUN kernel=$(ls /lib/modules | head -n1) && depmod -a "${kernel}"
     END
 
-    # If it's an ARM flavor, we want a symlink here
-    IF [ "$FLAVOR" = "alpine-arm-rpi" ] || [ "$FLAVOR" = "opensuse-arm-rpi" ] || [ "$FLAVOR" = "tumbleweed-arm-rpi" ]
-     RUN ln -sf Image /boot/vmlinuz
+    IF [ ! -e "/boot/vmlinuz" ]
+        # If it's an ARM flavor, we want a symlink here from zImage/Image
+        IF [ -e "/boot/Image" ]
+            RUN ln -sf Image /boot/vmlinuz
+        ELSE IF [ -e "/boot/zImage" ]
+            RUN ln -sf zImage /boot/vmlinuz
+        ELSE
+            RUN kernel=$(ls /lib/modules | head -n1) && \
+             ln -sf "${kernel#/boot/}" /boot/vmlinuz
+        END
     END
 
     SAVE IMAGE $IMAGE
@@ -292,13 +312,13 @@ iso:
     SAVE ARTIFACT /build/$ISO_NAME.iso.sha256 kairos.iso.sha256 AS LOCAL build/$ISO_NAME.iso.sha256
 
 netboot:
-   FROM opensuse/leap
+   ARG OSBUILDER_IMAGE
+   FROM $OSBUILDER_IMAGE
    ARG VERSION
    ARG ISO_NAME=${OS_ID}
    WORKDIR /build
    COPY +iso/kairos.iso kairos.iso
    COPY . .
-   RUN zypper in -y cdrtools
    RUN /build/scripts/netboot.sh kairos.iso $ISO_NAME $VERSION
    SAVE ARTIFACT /build/$ISO_NAME.squashfs squashfs AS LOCAL build/$ISO_NAME.squashfs
    SAVE ARTIFACT /build/$ISO_NAME-kernel kernel AS LOCAL build/$ISO_NAME-kernel
@@ -306,14 +326,11 @@ netboot:
    SAVE ARTIFACT /build/$ISO_NAME.ipxe ipxe AS LOCAL build/$ISO_NAME.ipxe
 
 arm-image:
-  ARG ELEMENTAL_IMAGE
-  FROM $ELEMENTAL_IMAGE
+  ARG OSBUILDER_IMAGE
+  FROM $OSBUILDER_IMAGE
   ARG MODEL=rpi64
   ARG IMAGE_NAME=${FLAVOR}.img
-  RUN zypper in -y jq docker git curl gptfdisk kpartx sudo
-  COPY +luet/luet /usr/bin/luet
   WORKDIR /build
-  RUN git clone https://github.com/rancher/elemental-toolkit && mkdir elemental-toolkit/build
   ENV STATE_SIZE="6200"
   ENV RECOVERY_SIZE="4200"
   ENV SIZE="15200"
@@ -321,12 +338,11 @@ arm-image:
   COPY --platform=linux/arm64 +docker-rootfs/rootfs /build/image
   # With docker is required for loop devices
   WITH DOCKER --allow-privileged
-    RUN cd elemental-toolkit && \
-          ./images/arm-img-builder.sh --model $MODEL --directory "/build/image" build/$IMAGE_NAME && mv build ../
+    RUN /build-arm-image.sh --model $MODEL --directory "/build/image" /build/$IMAGE_NAME
   END
-  RUN xz -v /build/build/$IMAGE_NAME
-  SAVE ARTIFACT /build/build/$IMAGE_NAME.xz img AS LOCAL build/$IMAGE_NAME.xz
-  SAVE ARTIFACT /build/build/$IMAGE_NAME.sha256 img-sha256 AS LOCAL build/$IMAGE_NAME.sha256
+  RUN xz -v /build/$IMAGE_NAME
+  SAVE ARTIFACT /build/$IMAGE_NAME.xz img AS LOCAL build/$IMAGE_NAME.xz
+  SAVE ARTIFACT /build/$IMAGE_NAME.sha256 img-sha256 AS LOCAL build/$IMAGE_NAME.sha256
 
 ipxe-iso:
     FROM ubuntu
@@ -350,9 +366,9 @@ ipxe-iso:
 # Generic targets
 # usage e.g. ./earthly.sh +datasource-iso --CLOUD_CONFIG=tests/assets/qrcode.yaml
 datasource-iso:
-  ARG ELEMENTAL_IMAGE
+  ARG OSBUILDER_IMAGE
   ARG CLOUD_CONFIG
-  FROM $ELEMENTAL_IMAGE
+  FROM $OSBUILDER_IMAGE
   RUN zypper in -y mkisofs
   WORKDIR /build
   RUN touch meta-data
@@ -399,7 +415,7 @@ linux-bench-scan:
 run-qemu-datasource-tests:
     FROM opensuse/leap
     WORKDIR /test
-    RUN zypper in -y qemu-x86 qemu-arm qemu-tools go
+    RUN zypper in -y qemu-x86 qemu-arm qemu-tools go git
     ARG FLAVOR
     ARG TEST_SUITE=autoinstall-test
     ENV FLAVOR=$FLAVOR
@@ -410,7 +426,6 @@ run-qemu-datasource-tests:
 
     ENV GOPATH="/go"
 
-    RUN go install -mod=mod github.com/onsi/ginkgo/v2/ginkgo
     ENV CLOUD_CONFIG=$CLOUD_CONFIG
     COPY . .
     RUN ls -liah
@@ -427,6 +442,11 @@ run-qemu-datasource-tests:
     ELSE 
         ENV DATASOURCE=/test/build/datasource.iso
     END
+    RUN go get github.com/onsi/gomega/...
+    RUN go get github.com/onsi/ginkgo/v2/ginkgo/internal@v2.1.4
+    RUN go get github.com/onsi/ginkgo/v2/ginkgo/generators@v2.1.4
+    RUN go get github.com/onsi/ginkgo/v2/ginkgo/labels@v2.1.4
+    RUN go install -mod=mod github.com/onsi/ginkgo/v2/ginkgo
 
     ENV CLOUD_INIT=/tests/tests/$CLOUD_CONFIG
 
@@ -435,7 +455,7 @@ run-qemu-datasource-tests:
 run-qemu-test:
     FROM opensuse/leap
     WORKDIR /test
-    RUN zypper in -y qemu-x86 qemu-arm qemu-tools go
+    RUN zypper in -y qemu-x86 qemu-arm qemu-tools go git
     ARG FLAVOR
     ARG TEST_SUITE=upgrade-with-cli
     ARG CONTAINER_IMAGE
@@ -447,9 +467,14 @@ run-qemu-test:
 
     ENV GOPATH="/go"
 
-    RUN go install -mod=mod github.com/onsi/ginkgo/v2/ginkgo
 
     COPY . .
+    RUN go get github.com/onsi/gomega/...
+    RUN go get github.com/onsi/ginkgo/v2/ginkgo/internal@v2.1.4
+    RUN go get github.com/onsi/ginkgo/v2/ginkgo/generators@v2.1.4
+    RUN go get github.com/onsi/ginkgo/v2/ginkgo/labels@v2.1.4
+    RUN go install -mod=mod github.com/onsi/ginkgo/v2/ginkgo
+
     ARG ISO=$(ls /test/build/*.iso)
     ENV ISO=$ISO
 

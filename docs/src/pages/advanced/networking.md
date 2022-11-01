@@ -4,17 +4,19 @@ title: "Networking"
 index: 8
 ---
 
-By default Kairos ISOs are configured to automatically get an ip from the network interface. However, depending on the base system you have chosen, there are different way to configure networking. This section collects information on setting network configuration depending on the base that is being chosen (openSUSE, Alpine, Ubuntu).
+# Networking settings
 
-There are different network manager depending on the distro:
+By default, Kairos ISOs are configured to automatically get an IP from the network interface. However, depending on the base system you have chosen, there are different way to configure networking. This section collects information on setting network configuration depending on the base that is being chosen (openSUSE, Alpine, Ubuntu).
 
-- `connman` is available on Alpine based distribution. By default is enabled on Kairos Alpine flavored variants.
+There are different network managers depending on the distro:
+
+- `connman` is available on Alpine-based distribution. By default is enabled on Kairos Alpine flavored variants.
 - The openSUSE based flavor uses `wicked`
 - The Ubuntu flavor uses `systemd-networkd`
 
 ## Static IP
 
-To get a static IP, you can additionally define the following in your config file, depending on the network-manager being used:
+To get a static IP, you can additionally define the following in your configuration file, depending on the network-manager being used:
 
 {{< tabs groupId="staticIP">}}
 {{% tab name="connman" %}}

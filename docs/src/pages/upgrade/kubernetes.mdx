@@ -6,6 +6,8 @@ index: 3
 
 import Info from "../../components/Info.astro";
 
+# Upgrading from Kubernetes
+
 Kairos upgrades can be driven either manually or via Kubernetes. In order to trigger upgrades, it is required to apply a Central Registration Depository (CRD®) to the target cluster for the upgrade.
 
 ### Upgrading from version X to version Y with Kubernetes
@@ -15,7 +17,7 @@ To upgrade a node, it is necessary [system-upgrade-controller](https://github.co
 To install it, use kubectl:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/rancher/system-upgrade-controller/master/manifests/system-upgrade-controller.yaml
+kubectl apply -f https://github.com/rancher/system-upgrade-controller/releases/download/v0.9.1/system-upgrade-controller.yaml
 ```
 
 To trigger an upgrade, create a plan for the `system-upgrade-controller` which refers to the image version that we want to upgrade.
@@ -68,11 +70,11 @@ $ kubectl get pods -A
 system-upgrade   apply-os-upgrade-on-kairos-with-1a1a24bcf897bd275730bdd8548-h7ffd   0/1     Creating   0          40s
 ```
 
-Done! We should have all the basic to get our first cluster rolling, but there is much more we can do.
+Done! We should have all the basics to get our first cluster rolling, but there is much more we can do.
 
 ## Customize the upgrade plan
 
-It is possible to run additional commands before the upgrade takes place into the node, consider the following example
+It is possible to run additional commands before the upgrade takes place into the node, consider the following example:
 
 ```yaml
 ---
@@ -126,7 +128,7 @@ spec:
 
 ## Upgrade from c3os to Kairos
 
-If you have already a `c3os` deployment, upgrading to Kairos requires changing every instance of `c3os` to `kairos` in the config file. This can be either done manually or with Kubernetes before rolling the upgrade, consider customize the upgrade plan, for instance:
+If you have already a `c3os` deployment, upgrading to Kairos requires changing every instance of `c3os` to `kairos` in the configuration file. This can be either done manually or with Kubernetes before rolling the upgrade.  Consider customize the upgrade plan, for instance:
 
 ```yaml
 ---
@@ -178,5 +180,5 @@ spec:
 ## What's next?
 
 - [Upgrade nodes manually](/upgrade/manual)
-- [Immutable architeture](/architecture/immutable)
+- [Immutable architecture](/architecture/immutable)
 - [Create decentralized clusters](/installation/p2p)

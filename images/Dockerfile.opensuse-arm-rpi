@@ -66,11 +66,10 @@ RUN zypper in -y \
     procps \
     sudo \
     sysconfig \
+    polkit \
     sysconfig-netconfig \
     sysvinit-tools \
     systemd-network \
-    wicked \
-    wicked-service \
     rng-tools \
     rsync \
     squashfs \
@@ -82,4 +81,5 @@ RUN zypper in -y \
     timezone \
     tmux \
     vim \
+    wpa_supplicant \
     which && zypper cc

@@ -27,6 +27,7 @@ var _ = Describe("kairos install test", Label("install-test"), func() {
 	})
 
 	testInstall := func(cloudConfig string, actual interface{}, m types.GomegaMatcher) {
+		stateAssert("persistent.found", "false")
 
 		t, err := ioutil.TempFile("", "test")
 		ExpectWithOffset(1, err).ToNot(HaveOccurred())
@@ -75,6 +76,27 @@ bundles:
 				out, _ = Sudo("/usr/local/bin/usr/bin/edgevpn --help")
 				return out
 			}, ContainSubstring("peerguard"))
+		})
+		It("cloud-config syntax mixed with extended syntax", func() {
+			testInstall(`#cloud-config
+install:
+  auto: true
+  device: /dev/sda
+users:
+- name: "kairos"
+  passwd: "kairos"
+stages:
+  initramfs:
+  - name: "Set user and password"
+    commands:
+    - echo "bar" > /etc/foo
+`, func() string {
+				var out string
+				out, _ = Sudo("cat /etc/foo")
+				return out
+			}, ContainSubstring("bar"))
+
+			stateAssert("persistent.found", "true")
 		})
 		It("with config_url", func() {
 			testInstall(`

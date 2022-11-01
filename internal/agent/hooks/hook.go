@@ -12,7 +12,13 @@ var All = []Interface{
 	&RunStage{},    // Shells out to stages defined from the container image
 	&GrubOptions{}, // Set custom GRUB options
 	&BundleOption{},
+	&Kcrypt{},
 	&Lifecycle{}, // Handles poweroff/reboot by config options
+}
+
+var FirstBoot = []Interface{
+	&BundlePostInstall{},
+	&GrubPostInstallOptions{},
 }
 
 func Run(c config.Config, hooks ...Interface) error {

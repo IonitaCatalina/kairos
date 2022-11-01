@@ -4,10 +4,12 @@ title: "Automated installation"
 index: 4
 ---
 
-It is possible to drive the installation automatically by configuring a specific portion of the configuration file `install`.
-The configuration file then can be supplied in various way, by either creating an additional ISO to mount (if a VM burn to USB stick or if bare metal), specifying a config via URL or even create a ISO from a container image with an embedded config file, which we are going to explore here.
+# Automated installation
 
-The `install` block can be used to customize the installation drive, reboot or shutdown, and additional bundles. For example:
+It is possible to drive the installation automatically by configuring a specific portion of the `install` configuration file .
+The configuration file then can be supplied in various way, by either creating an additional ISO to mount (if a VM burn to USB stick or if bare metal), specifying a configuration via URL or even create an ISO from a container image with an embedded configuration file, which we are going to explore here.
+
+The `install` block can be used to customize the installation drive, reboot or shutdown, and include bundles. For example:
 
 ```yaml
 install:
@@ -28,7 +30,7 @@ install:
 
 The configuration file can be provided to Kairos by mounting an ISO in the node with the `cidata` label. The ISO must contain a `user-data` (which contain your configuration) and `meta-data` file.
 
-Consider a cloud-init of the following content, which is configured to automatically install onto `/dev/sda` and reboot:
+Consider a `cloud-init` of the following content which is configured to automatically install onto `/dev/sda` and reboot:
 
 ```yaml
 #node-config
@@ -60,17 +62,17 @@ Now the ISO is ready to be attached as the CDROM to the machine, boot it up as u
 
 ## Via config URL
 
-It is possible to specify `config_url=<URL>` as boot argument during boot. This will let the machine pull down the configuration specified via URL and perform the installation with the configuration specified. The configuration will be available in the system after installation as usual at `/oem/99_custom.yaml`.
+It is possible to specify `config_url=<URL>` as a boot argument during boot. This will let the machine pull down the configuration specified via the URL and perform the installation with the configuration specified. The configuration will be available in the system after installation as usual at `/oem/99_custom.yaml`.
 
 If you don't know where to upload such configuration, it is common habit to upload those as GitHub gists.
 
 ## ISO remastering
 
-It is possible to create custom ISOs with an embedded cloud-config. This will let the machine automatically boot with a configuration file, which later will be installed in the system after provisioning is completed.
+It is possible to create custom ISOs with an embedded cloud-config. This will let the machine automatically boot with a configuration file, which will later be installed in the system after provisioning is completed.
 
 ### Locally
 
-To remaster an ISO locally, you just need docker.
+To remaster an ISO locally, you need Docker.
 
 As Kairos is based on Elemental, the Elemental CLI can be used to create a new ISO with an additional configuration, consider the following steps:
 
@@ -94,13 +96,13 @@ $ docker run -v $PWD:/cOS -v /var/run/docker.sock:/var/run/docker.sock -i --rm q
 
 It is possible to create ISOs and derivatives, using extended Kubernetes API resources with an embedded config file, to drive automated installations.
 
-This method also allows to tweak the container image by overlaying others on top—without breaking the concept of immutability and single image OS.
+This method also allows to tweak the container image by overlaying others on top without breaking the concept of immutability and single image OS.
 
 Consider the following example, which requires a Kubernetes cluster to run the components, but works also on `kind`:
 
 ```bash
 
-# Adds the Kairos repo to helm
+# Adds the Kairos repo to Helm
 $ helm repo add kairos https://Kairos-io.github.io/helm-charts
 "kairos" has been added to your repositories
 $ helm repo update
@@ -136,47 +138,15 @@ spec:
   imageName: "quay.io/kairos/core-opensuse:latest"
   iso: true
   bundles:
-  - quay.io/kairos/packages:goreleaser-utils-1.11.2
-  grubConfig: |
-          search --file --set=root /boot/kernel.xz
-          set default=0
-          set timeout=10
-          set timeout_style=menu
-          set linux=linux
-          set initrd=initrd
-          if [ "${grub_cpu}" = "x86_64" -o "${grub_cpu}" = "i386" -o "${grub_cpu}" = "arm64" ];then
-              if [ "${grub_platform}" = "efi" ]; then
-                  if [ "${grub_cpu}" != "arm64" ]; then
-                      set linux=linuxefi
-                      set initrd=initrdefi
-                  fi
-              fi
-          fi
-          if [ "${grub_platform}" = "efi" ]; then
-              echo "Please press 't' to show the boot menu on this console"
-          fi
-          set font=($root)/boot/${grub_cpu}/loader/grub2/fonts/unicode.pf2
-          if [ -f ${font} ];then
-              loadfont ${font}
-          fi
-          menuentry "install" --class os --unrestricted {
-              echo Loading kernel...
-              $linux ($root)/boot/kernel.xz cdroot root=live:CDLABEL=COS_LIVE rd.live.dir=/ rd.live.squashimg=rootfs.squashfs console=tty1 console=ttyS0 rd.cos.disable vga=795 nomodeset nodepair.enable
-              echo Loading initrd...
-              $initrd ($root)/boot/rootfs.xz
-          }
-
-          if [ "${grub_platform}" = "efi" ]; then
-              hiddenentry "Text mode" --hotkey "t" {
-                  set textmode=true
-                  terminal_output console
-              }
-          fi
-
+  # Bundles available at: https://packages.kairos.io/Kairos/
+  - quay.io/kairos/packages:helm-utils-3.10.1
   cloudConfig: |
-            #node-config
+            #cloud-config
+            users:
+            - name: "kairos"
+              passwd: "kairos"
             install:
-              device: "/dev/sda"
+              device: "auto"
               reboot: true
               poweroff: false
               auto: true # Required, for automated installations
